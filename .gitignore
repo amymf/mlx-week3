@@ -3,6 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# wandb
+wandb/
+
+# models
+*.pth
+
 # C extensions
 *.so
 
