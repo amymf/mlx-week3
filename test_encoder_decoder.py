@@ -32,10 +32,12 @@ with torch.no_grad():
         outputs = model(images, input_labels)
 
         # Calculate accuracy
+        mask = target != label_to_index["<pad>"]  # shape: (batch_size, seq_len)
         _, predicted = torch.max(outputs.data, dim=2)  # shape: (batch_size, seq_len)
-        total += target.numel()  # total number of labels (batch_size * seq_len)
-        correct += (predicted == target).sum().item()
-        all_correct += (predicted == target).all(dim=1).sum().item()
+        total += mask.sum().item()  # total number of labels excluding padding
+        correct += ((predicted == target) & mask).sum().item()
+        sequence_correct = ((predicted == target) | ~mask).all(dim=1)
+        all_correct += sequence_correct.sum().item()
 
 accuracy = 100 * correct / total
 accuracy_all = 100 * all_correct / len(test_dataset)

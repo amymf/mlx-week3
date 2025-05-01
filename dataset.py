@@ -2,6 +2,7 @@ import torch
 from torchvision import transforms
 from datasets import load_dataset
 import math
+import random
 
 label_to_index = {
     0: 0,
@@ -54,13 +55,15 @@ test_dataset = MNISTDataset(ds["test"], transform=transform)
 
 
 class MNISTTiledDataset(torch.utils.data.Dataset):
-    def __init__(self, hf_dataset, num_images, transform=None):
+    def __init__(self, hf_dataset, num_images, transform=None, blank_prob=0.3):
         if int(math.sqrt(num_images)) ** 2 != num_images:
             raise ValueError("num_images must be a perfect square (e.g. 4, 9, 16)")
         self.dataset = hf_dataset
         self.transform = transform
         self.num_images = num_images
         self.grid_size = int(math.sqrt(num_images))
+        self.blank_prob = blank_prob
+        self.blank_image = torch.zeros((1, 28, 28))
 
     def __len__(self):
         return len(self.dataset) // self.num_images
@@ -79,8 +82,12 @@ class MNISTTiledDataset(torch.utils.data.Dataset):
             if self.transform:
                 image = self.transform(image)
 
-            images.append(image)
-            labels.append(label_to_index[label])
+            if random.random() < self.blank_prob:
+                # Replace image with blank
+                images.append(self.blank_image.clone())
+            else:
+                images.append(image)
+                labels.append(label_to_index[label])
 
         # Create each row in the grid
         for i in range(self.grid_size):
@@ -89,16 +96,17 @@ class MNISTTiledDataset(torch.utils.data.Dataset):
             )  # concat width-wise
             grid_rows.append(row)
 
-        # Stack all rows height-wise
         tiled_image = torch.cat(grid_rows, dim=1)  # concat height-wise
-        input_label = torch.tensor(
-            [label_to_index["<sos>"]] + labels,
-            dtype=torch.long,
-        )
-        target = torch.tensor(
-            labels + [label_to_index["<eos>"]],
-            dtype=torch.long,
-        )
+
+        max_len = self.num_images + 1
+        input_labels = [label_to_index["<sos>"]] + labels
+        targets = labels + [label_to_index["<eos>"]]
+        # Pad input_labels and targets to the same length
+        input_labels += [label_to_index["<pad>"]] * (max_len - len(input_labels))
+        targets += [label_to_index["<pad>"]] * (max_len - len(targets))
+
+        input_label = torch.tensor(input_labels, dtype=torch.long)
+        target = torch.tensor(targets, dtype=torch.long)
         return tiled_image, input_label, target
 
 

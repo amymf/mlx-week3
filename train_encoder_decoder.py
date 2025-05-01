@@ -43,11 +43,17 @@ for epoch in range(num_epochs):
             target.to(device),
         )
 
+        # Create padding mask
+        mask = target != label_to_index["<pad>"]  # shape: (batch_size, seq_len)
+
         # forward
-        outputs = model(
-            images, input_labels
-        )  # shape: (batch_size, seq_len, num_classes)
+        outputs = model(images, input_labels)
+        # Reshape output to (batch_size * seq_len, num_classes)
+        # and target to (batch_size * seq_len)
         loss = criterion(outputs.view(-1, len(label_to_index)), target.view(-1))
+
+        # Apply mask to the loss
+        loss = (loss * mask.view(-1)).sum() / mask.sum()
 
         # backward
         optimizer.zero_grad()
@@ -58,8 +64,8 @@ for epoch in range(num_epochs):
 
         # Calculate accuracy
         _, predicted = torch.max(outputs.data, dim=2)  # shape: (batch_size, seq_len)
-        total_train += target.numel()  # total number of labels (batch_size * seq_len)
-        correct_train += (predicted == target).sum().item()
+        total_train += mask.sum().item()  # total number of labels excluding padding
+        correct_train += ((predicted == target) & mask).sum().item()
 
     # Validation
     model.eval()
@@ -75,16 +81,24 @@ for epoch in range(num_epochs):
                 target.to(device),
             )
 
+            # Create padding mask
+            mask = target != label_to_index["<pad>"]  # shape: (batch_size, seq_len)
+
             # forward
             outputs = model(images, input_labels)
+            # Reshape output to (batch_size * seq_len, num_classes)
+            # and target to (batch_size * seq_len)
             loss = criterion(outputs.view(-1, len(label_to_index)), target.view(-1))
+
+            # Apply mask to the loss
+            loss = (loss * mask.view(-1)).sum() / mask.sum()
 
             val_loss += loss.item()
 
             # Calculate accuracy
             _, predicted = torch.max(outputs.data, dim=2)
-            total_val += target.numel()
-            correct_val += (predicted == target).sum().item()
+            total_val += mask.sum().item()  # total number of labels excluding padding
+            correct_val += ((predicted == target) & mask).sum().item()
 
     avg_train_loss = train_loss / len(train_dataloader)
     avg_val_loss = val_loss / len(val_dataloader)
