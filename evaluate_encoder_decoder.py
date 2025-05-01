@@ -65,7 +65,6 @@ for batch_idx, batch in enumerate(test_dataloader):
     all_correct += sequence_correct.sum().item()
 
     # visualization
-    mask = target != label_to_index["<pad>"]  # shape: (batch_size, seq_len)
     if batch_idx == 0:
         for i in range(num_visualizations):  # show first N examples
             img = images[i].cpu().squeeze().numpy()  # shape: (H, W)
