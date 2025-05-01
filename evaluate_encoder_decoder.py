@@ -57,11 +57,11 @@ for batch_idx, batch in enumerate(test_dataloader):
         start_sentences[:, i + 1] = next_token
     predictions = torch.stack(predictions, dim=1)  # shape: (batch_size, seq_len)
 
+    target = target[:, :num_images] # only keep the first num_images tokens
     mask = target != label_to_index["<pad>"]  # shape: (batch_size, seq_len)
-    _, predicted = torch.max(outputs.data, dim=2)  # shape: (batch_size, seq_len)
     total += mask.sum().item()  # total number of labels excluding padding
-    correct += ((predicted == target) & mask).sum().item()
-    sequence_correct = ((predicted == target) | ~mask).all(dim=1)
+    correct += ((predictions == target) & mask).sum().item()
+    sequence_correct = ((predictions == target) | ~mask).all(dim=1)
     all_correct += sequence_correct.sum().item()
 
     # visualization
@@ -72,9 +72,9 @@ for batch_idx, batch in enumerate(test_dataloader):
 
             # Get the real and predicted labels, filtering out pads
             true_labels = [index_to_label[l.item()] for l, m in zip(target[i], mask[i]) if m]
-            pred_labels = [index_to_label[p.item()] for p, m in zip(predicted[i], mask[i]) if m]
+            pred_labels = [index_to_label[p.item()] for p, m in zip(predictions[i], mask[i]) if m]
             true_labels = [str(index_to_label[int(idx)]) for idx in target[i] if int(idx) not in exclude_tokens]
-            pred_labels = [str(index_to_label[int(idx)]) for idx in predicted[i] if int(idx) not in exclude_tokens]
+            pred_labels = [str(index_to_label[int(idx)]) for idx in predictions[i] if int(idx) not in exclude_tokens]
 
             axs[i].imshow(img, cmap="gray")
             axs[i].axis("off")
