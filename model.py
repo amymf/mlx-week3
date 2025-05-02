@@ -36,13 +36,13 @@ def scaled_dot_product_attention(query, key, value, use_mask=False):
     """
     Compute the scaled dot-product attention.
     Args:
-        query: Queries of shape (batch_size, num_heads, num_patches, head_dim)
-        key: Keys of shape (batch_size, num_heads, num_patches, head_dim)
-        value: Values of shape (batch_size, num_heads, num_patches, head_dim)
-        mask: Optional mask of shape (batch_size, num_heads, num_patches, num_patches)
+        query: Queries of shape (batch_size, num_heads, query_len, head_dim)
+        key: Keys of shape (batch_size, num_heads, key_len, head_dim)
+        value: Values of shape (batch_size, num_heads, value_len, head_dim)
+        mask: Optional mask of shape (batch_size, num_heads, query_len, key_len)
     Returns:
-        output: Attention output of shape (batch_size, num_heads, num_patches, head_dim)
-        attention: Attention weights of shape (batch_size, num_heads, num_patches, num_patches)
+        output: Attention output of shape (batch_size, num_heads, query_len, head_dim)
+        attention: Attention weights of shape (batch_size, num_heads, query_len, key_len)
     """
     d_k = query.size(-1)  # head_dim
     scores = torch.matmul(query, key.transpose(-2, -1)) / (d_k**0.5)
@@ -70,8 +70,8 @@ class MultiHeadAttention(nn.Module):
         self.fc_out = nn.Linear(output_dim, output_dim)
 
     def forward(self, x, y, use_mask=False):
-        # x shape: (batch_size, num_patches, x_dim) - Query
-        # y shape: (batch_size, num_patches, y_dim) - Key and Value
+        # x shape: (batch_size, query_len, x_dim) - Query
+        # y shape: (batch_size, key_len, y_dim) - Key and Value
 
         batch_size = x.size(0)
 
@@ -81,11 +81,13 @@ class MultiHeadAttention(nn.Module):
         value = self.value_fc(y)
 
         # Split into multiple heads
-        # [batch_size, num_heads, num_patches, head_dim]
+        # [batch_size, num_heads, query_len, head_dim]
         query = query.view(batch_size, -1, self.num_heads, self.head_dim).transpose(
             1, 2
         )
+        # [batch_size, num_heads, key_len, head_dim]
         key = key.view(batch_size, -1, self.num_heads, self.head_dim).transpose(1, 2)
+        # [batch_size, num_heads, value_len, head_dim]
         value = value.view(batch_size, -1, self.num_heads, self.head_dim).transpose(
             1, 2
         )
@@ -99,7 +101,7 @@ class MultiHeadAttention(nn.Module):
         )
 
         # Final linear layer
-        # (batch_size, num_patches, num_heads * head_dim) -> (batch_size, num_patches, output_dim)
+        # (batch_size, query_len, num_heads * head_dim) -> (batch_size, query_len, output_dim)
         output = self.fc_out(output)
         return output
 
@@ -112,7 +114,7 @@ class FeedForwardNetwork(nn.Module):
         self.fc2 = nn.Linear(ff_dim, model_dim)
 
     def forward(self, x):
-        # x shape: (batch_size, num_patches, model_dim)
+        # x shape: (batch_size, seq_len, model_dim)
         x = self.fc1(x)
         x = self.relu(x)
         x = self.fc2(x)
